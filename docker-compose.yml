@@ -1,0 +1,26 @@
+# docker-compose.yml
+services:
+  robot-pipeline:
+    image: robot-pipeline:latest
+    container_name: pipeline-container
+    network_mode: host
+    privileged: true
+    # devices:
+    #   - "/dev/ttyACM0:/dev/ttyACM0"
+    #   - "/dev/ttyACM1:/dev/ttyACM1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, utility]
+    volumes:
+      - /run/udev:/run/udev:ro
+      - /sys/class/video4linux:/sys/class/video4linux:ro
+      - /sys/bus/usb:/sys/bus/usb:ro
+      - /dev:/dev:rw
+      - /home/server/project:/root/project:rw
+    stdin_open: true
+    tty: true
+    command: "/bin/bash"

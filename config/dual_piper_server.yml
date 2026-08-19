@@ -1,0 +1,13 @@
+INFO_LEVEL: INFO # DEBUG, INFO, ERROR
+
+# 机器人控制配置（真实双臂接入位；硬件 SDK 仅在机器人端安装）
+robot:
+  name: dual_piper
+  type: dual_piper
+  step_rad: 0.1 # 每帧最大关节增量（rad），env 主循环限速接近 target
+  init_qpos: [0, 0.1, 0, 0, 0, 0, 1, 0, 0.1, 0, 0, 0, 0, 1]
+
+# 采集配置（env 在 capture start/end 之间把观测写成一条 hdf5 episode）
+collector:
+  save_dir: ./data/dual_piper # 采集数据保存目录
+  image_format: jpeg # 图像编码：jpeg | raw

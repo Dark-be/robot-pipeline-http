@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=69,<=80.1.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robot-pipeline"
+version = "1.0"
+description = "Robot pipeline open source repo"
+readme = "README.md"
+requires-python = "==3.10.*"
+license = { file = "LICENSE" }
+
+# 基本框架依赖
+dependencies = [
+  "numpy",      # 数值计算
+  "h5py",       # 数据存储
+  "pyyaml",     # 配置文件解析
+  "opencv-python-headless",  # 计算机视觉
+  "pyrealsense2>=2.58.1.10581",
+  "v4l2-python3>=0.3.5",
+  "ipython>=8.39.0",
+  "fastapi>=0.141.1",
+  "uvicorn[standard]>=0.52.1",
+]
+
+[project.optional-dependencies]
+# ===== 硬件相关（按需安装）=====
+# 相机设备
+realsense = ["pyrealsense2"]
+v4l2 = ["v4l2-python3"]
+udev = ["pyudev"]
+# 完整相机支持（Linux）
+camera = [
+  "robot-pipeline[realsense]",
+  "robot-pipeline[v4l2]",
+  "robot-pipeline[udev]",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+# 使用标准 src/ 布局：让 `import robot` / `import task_env` 指向 src 下的同名目录
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+# 仅在 src/ 下发现包
+where = ["src"]
+exclude = ["tests*", "third_party*", "docs*", "assets*", "packages*", "build*"]
+
+[tool.pytest.ini_options]
+markers = ["manual: should be run manually."]
+testpaths = ["src", "scripts", "pipeline"]

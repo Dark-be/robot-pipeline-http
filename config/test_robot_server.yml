@@ -1,0 +1,13 @@
+INFO_LEVEL: INFO # DEBUG, INFO, ERROR
+
+# 机器人控制配置（只与控制有关；服务器 host/port 用 ROBOT_SERVER_HOST/PORT 或 --host/--port）
+robot:
+  name: test_robot
+  type: test_robot
+  step_rad: 0.01 # 每帧最大关节增量（rad），env 主循环限速接近 target
+  init_qpos: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1] # 初始关节位置（rad），env reset 时设置
+
+# 采集配置（env 在 capture start/end 之间把观测写成一条 hdf5 episode）
+collector:
+  save_dir: ./data/test_robot # 采集数据保存目录
+  image_format: jpeg # 图像编码：jpeg | raw

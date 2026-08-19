@@ -1,0 +1,33 @@
+# Ignore all .pyc files
+*.pyc
+
+# Ignore __pycache__ directory
+__pycache__/
+
+# Ignore other Python cache files
+*.pyo
+*.pyd
+*.egg-info
+uv.lock
+
+build/
+.venv/
+.vscode/
+
+# data files
+/data/
+
+*.hdf5
+
+/third_party/
+
+logs/
+
+*.pkl
+*.ckpt
+
+/src/detr
+/test.py
+te.py
+/web
+/zmq
