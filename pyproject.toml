@@ -13,7 +13,7 @@ license = { file = "LICENSE" }
 # 基本框架依赖
 dependencies = [
   "numpy",      # 数值计算
-  "h5py",       # 数据存储
+  "mcap-ros2-support",  # MCAP 数据容器（Foxglove），act_mcap collector 按 ROS2 官方消息格式写入
   "pyyaml",     # 配置文件解析
   "opencv-python-headless",  # 计算机视觉
   "pyrealsense2>=2.58.1.10581",

@@ -32,6 +32,7 @@
 """
 
 import numpy as np
+import time
 
 from utils.base.data_handler import debug_print
 
@@ -156,9 +157,10 @@ class BaseRobot:
         self.seq += 1
         qpos = self.get_observation_qpos()
         action = self.get_action()
+        timestamp = time.time()
         if action is None:
             action = qpos  # 无指令时以当前 qpos 作为 action（保证观测含有效 action）
-        obs = {self.KEY_QPOS: qpos, "action": action}
+        obs = {self.KEY_QPOS: qpos, "action": action, "timestamp": timestamp}
         # 相机成员：observations/images/<cam_name>（顺序对齐 IMAGE_NAMES）
         for name, img in zip(self.IMAGE_NAMES, self.get_observation_images()):
             obs[f"{self.CAMERA_PREFIX}{name}"] = img

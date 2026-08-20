@@ -24,7 +24,7 @@ env 保留的观测副本（30Hz 由 env 调用 robot.get_observation() 产生�
     POST /v1/capture/start 开始一轮采集（episode 开始）
     POST /v1/capture/end   结束一轮采集（episode 结束）
 
-入口见 server/test_robot_server.py（虚拟）与 server/dual_piper_server.py（真实接入位）。
+入口见 server/robot_server.py（按 config 自动匹配机器人，由 robot.type 选择虚拟/真实接入位）。
 """
 
 from __future__ import annotations
@@ -43,12 +43,14 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from config._GLOBAL_CONFIG import ROOT_DIR
 from utils.base.data_handler import debug_print
 
 # ----------------------------------------------------------------------------
 # 契约（复用 adapter 包定义：观测键 / HTTP 端点 / 共享内存布局）
 # ----------------------------------------------------------------------------
-_ADAPTER_DIR = Path(__file__).resolve().parents[1] / "adapter"
+# adapter 目录位于项目根（不在 src 包内）；用 ROOT_DIR 定位，不依赖 __file__ 层级
+_ADAPTER_DIR = Path(ROOT_DIR) / "adapter"
 
 
 def _load_contract(module_name: str, file_name: str):
@@ -189,10 +191,14 @@ class _ShmPublisher:
                     self._writer = None
 
 
-def create_app(env) -> FastAPI:
-    """为已构造的机器人运行环境构建 /v1 契约应用（服务器不读配置；主循环在 env 内）。"""
-    host = _DEFAULT_HOST
-    port = int(_DEFAULT_PORT)
+def create_app(env, host: str | None = None, port: int | None = None) -> FastAPI:
+    """为已构造的机器人运行环境构建 /v1 契约应用（服务器不读配置；主循环在 env 内）。
+
+    ``host`` / ``port`` 用于 /v1/discover 上报 endpoint；None 时回退默认值。
+    实际监听由 ``serve()``（或 uvicorn）决定，可来自配置 server 段或命令行。
+    """
+    host = host or _DEFAULT_HOST
+    port = int(port or _DEFAULT_PORT)
     robot = env.robot
     # server 直接写共享内存：挂到 env 的每帧回调（env 不碰共享内存 / 契约）
     publisher = _ShmPublisher(robot)
@@ -308,7 +314,7 @@ def create_app(env) -> FastAPI:
 
     @app.post(PATH_CAPTURE_END)
     def capture_end():
-        """结束一轮采集（episode 结束）：env 置 capturing=False，保存为一条 hdf5。"""
+        """结束一轮采集（episode 结束）：env 置 capturing=False，保存为一条 episode。"""
         _require_ready()
         env.robot_capture_end()
         return {FIELD_STATUS: VALUE_STATUS_ACCEPTED}

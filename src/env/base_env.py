@@ -31,7 +31,7 @@ import queue
 import threading
 import time
 
-from collector.hdf5_collector import ActHDF5Collector
+from collector import get_collector
 from utils.base.data_handler import debug_print
 
 
@@ -49,8 +49,11 @@ class BaseEnv:
         self.commands: queue.Queue = queue.Queue()  # 命令队列（HTTP 线程入队，主循环消费）
 
         # 采集：capturing=True 时 step 记录观测；False 时保存为一条 episode
+        # collector 类型由 capture_config 里的 `type` 决定（当前支持 act_mcap，默认 mcap）
         self.capturing = False
-        self._collector = ActHDF5Collector(capture_config or {"save_dir": "./data", "image_format": "jpeg"})
+        self._collector = get_collector(
+            capture_config or {"type": "act_mcap", "save_dir": "./data", "image_format": "jpeg"}
+        )
         self._episode_idx = 0  # 下一个 episode 编号
         self._episode_open = False  # 当前是否有未关闭的 episode
         self._episodes: list[str] = []  # 已保存的 episode 文件路径
@@ -207,12 +210,22 @@ class BaseEnv:
         self._update_capture()
 
     def _update_capture(self):
-        """按 capturing 记录观测：True→记录本帧；False→结束并保存为一条 episode。"""
+        """按 capturing 记录观测：True→记录本帧；False→结束并保存为一条 episode。
+
+        流式 collector（实现了 start()，如 ActMcapCollector）在 capture 开始时由 env
+        调用 start(episode_idx) 打开文件，之后每帧 collect 直接落盘；缓冲式 collector
+        （如缓冲式 collector）无 start，仍按 collect→finish 一次性保存。
+        """
         if self.capturing:
-            self._episode_open = True
+            if not self._episode_open:
+                self._episode_open = True
+                start = getattr(self._collector, "start", None)
+                if start is not None:
+                    start(self._episode_idx)
             self._collector.collect(self.observation)
         elif self._episode_open:
             self._episode_open = False
-            self._collector.finish(self._episode_idx)
-            self._episodes.append(str(self._collector.save_dir / f"episode_{self._episode_idx}.hdf5"))
+            saved = self._collector.finish(self._episode_idx)
+            if saved is not None:
+                self._episodes.append(str(saved))
             self._episode_idx += 1

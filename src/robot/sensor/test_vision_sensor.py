@@ -27,8 +27,9 @@ class TestVisionSensor(Sensor):
         self.height = 480
         self.is_jpeg = True
 
-    def connect(self, is_jpeg=True):
+    def connect(self, is_jpeg=True, seed=None):
         self.is_jpeg = is_jpeg
+        self.seed = seed
 
     def get_information(self):
         """读取完整观测（color），不做 collect_info 过滤。"""
@@ -47,7 +48,7 @@ class TestVisionSensor(Sensor):
             # 蓝色通道：另一个相位
             # b = int(128 + 127 * np.cos(t + 3.14 + x * 0.02))
             b = 0
-
+            
             img[:, x, 0] = r
             img[:, x, 1] = g
             img[:, x, 2] = b

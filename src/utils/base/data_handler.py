@@ -1,4 +1,3 @@
-import h5py
 import cv2
 import os
 import sys
@@ -40,41 +39,6 @@ def get_item(Dict_data: Dict, item):
     else:
         raise ValueError(f"input type is not allow!")
     return data
-
-def hdf5_to_dict(h5obj):
-    if isinstance(h5obj, h5py.Dataset):
-        return h5obj[()]
-    elif isinstance(h5obj, h5py.Group):
-        return {k: hdf5_to_dict(v) for k, v in h5obj.items()}
-    else:
-        return None
-
-
-def load_hdf5_as_dict(hdf5_path):
-    with h5py.File(hdf5_path, "r") as f:
-        return hdf5_to_dict(f)
-        
-def hdf5_groups_to_dict(hdf5_path):
-    """
-    读取 HDF5 文件，返回真正的嵌套 dict
-    - dict.keys() 只包含第一层
-    - 子 group / dataset 保持原始层级
-    """
-    import h5py
-
-    def read_group(group):
-        out = {}
-        for key, item in group.items():
-            if isinstance(item, h5py.Dataset):
-                out[key] = item[()]
-            elif isinstance(item, h5py.Group):
-                out[key] = read_group(item)
-        return out
-
-    with h5py.File(hdf5_path, "r") as f:
-        result = read_group(f)
-
-    return result
 
 def get_files(directory, extension):
     """使用pathlib获取所有匹配的文件"""
@@ -178,39 +142,6 @@ def read_key():
             sys.stdin.read(1)
         return ch
     return None
-
-def vis_video(data_path, picture_key, save_path=None, fps=30):
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    episode = dict_to_list(hdf5_groups_to_dict(data_path))
-    
-    video_writer = None
-    
-    for idx, ep in enumerate(episode):
-        img_data = ep[picture_key]["color"]
-        
-        if isinstance(img_data, (bytes, bytearray)) or (isinstance(img_data, np.ndarray) and img_data.ndim == 1):
-            img_array = np.frombuffer(img_data, dtype=np.uint8)
-            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-        else:
-            img = img_data 
-        
-        # RGB -> BGR
-        img = img[:,:,::-1]
-        if save_path:
-            if video_writer is None:
-                h, w = img.shape[:2]
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # mp4 编码
-                video_writer = cv2.VideoWriter(save_path, fourcc, fps, (w, h))
-            
-            video_writer.write(img)
-        else:
-            cv2.imshow(f"{picture_key}", img)
-            cv2.waitKey(int(1000 / fps)) 
-
-    if video_writer:
-        video_writer.release()
-        debug_print("vis_video", f"save video at: {save_path} .", "INFO")
 
 # def jpeg_test(img_raw, jpeg_data):
 #     jpeg_bytes = jpeg_data.rstrip(b"\0")

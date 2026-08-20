@@ -1,5 +1,10 @@
 INFO_LEVEL: INFO # DEBUG, INFO, ERROR
 
+# 服务器监听地址（命令行 --host/--port 可覆盖）
+server:
+  host: 0.0.0.0
+  port: 8090
+
 # 机器人控制配置（单臂双 Piper：Leader 主臂 + Follower 从臂；硬件 SDK 仅在机器人端安装）
 robot:
   name: single_piper
@@ -11,7 +16,8 @@ robot:
   leader_firmware: v188 # Leader 主臂固件版本（default / v188 / v189；按实际固件调整）
   follower_firmware: v188 # Follower 从臂固件版本
 
-# 采集配置（env 在 capture start/end 之间把观测写成一条 hdf5 episode）
+# 采集配置（env 在 capture start/end 之间把观测写成一条 episode）
 collector:
+  type: act_mcap # 采集器类型：act_mcap（act_hdf5 暂不可用）
   save_dir: ./data/single_piper # 采集数据保存目录
   image_format: jpeg # 图像编码：jpeg | raw（本机器人无相机，无实际图像数据）

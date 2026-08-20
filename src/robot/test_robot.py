@@ -14,16 +14,23 @@
 
 """TestRobot —— 虚拟测试机器人（**无硬件依赖**，离线联调 Edge 侧 TestRobotAdapter）。
 
-- **合成关节**：限速接近 target_action（step_toward）并直接同步到状态（无伺服延迟）。
-- **合成图像**：每帧移动的 RGB 渐变 + 方块（raw RGB，与 shm_contract 布局一致）。
+参考 DualPiperRobot 的结构：由 **test 控制器 + test 视觉传感器**组装——动作经
+``_apply_action`` 下发到控制器，qpos 从控制器「手搓」读取，图像从传感器读取并解码
+为 raw RGB。
+
+- **控制器**：左/右臂 ``TestArmController``（内部有界随机游走，模拟关节反馈）。
+- **视觉传感器**：3 相机 ``TestVisionSensor``（每帧生成移动 RGB 渐变，JPEG 输出）。
 - 身份 / 共享内存名（``type="test_robot"`` / ``SHM="test_robot_obs"``）对齐
   ``TestRobotAdapter``；换真实 SDK 进程即可无缝替换。
 """
 
+import cv2
 import numpy as np
 
 from robot.base_robot import BaseRobot
-from utils.base.data_handler import debug_print
+from robot.controller.test_arm_controller import TestArmController  # noqa: E402
+from robot.sensor.test_vision_sensor import TestVisionSensor  # noqa: E402
+from utils.base.data_handler import debug_print  # noqa: E402
 
 
 class TestRobot(BaseRobot):
@@ -39,38 +46,82 @@ class TestRobot(BaseRobot):
 
     def __init__(self, robot_config: dict | None = None):
         super().__init__(robot_config)
-        # 合成状态：扁平 QPOS 维动作（init_qpos 来自 config，可能为 list → 转 np 数组）
-        self.qpos = np.asarray(self.init_qpos, dtype=np.float64).copy()
-        self._frame = 0  # 合成图像帧计数器（每帧移动方块）
+        # 控制器：左/右臂 test 控制器（执行）；传感器：3 个 test 视觉传感器（相机）
+        # 结构对齐 DualPiperRobot（无 master 主手：测试机器人不做遥操作）
+        self.controllers: dict = {
+            'left_arm': TestArmController('left_arm'),  # 左臂，执行
+            'right_arm': TestArmController('right_arm'),  # 右臂，执行
+        }
+        self.sensors: dict = {
+            'cam_head': TestVisionSensor('cam_head'),
+            'cam_left_wrist': TestVisionSensor('cam_left_wrist'),
+            'cam_right_wrist': TestVisionSensor('cam_right_wrist'),
+        }
 
     def connect(self):
-        """虚拟机器人：无需硬件，直接就绪。"""
+        """连接 test 控制器与视觉传感器（虚拟，无硬件）。"""
+        for ctrl in self.controllers.values():
+            ctrl.connect()
+        for sensor in self.sensors.values():
+            sensor.connect(is_jpeg=True)
         self.ready = True
         debug_print(self.name, "TestRobot connected (virtual).", "INFO")
 
+    def disconnect(self):
+        """断开控制器与传感器（幂等，重复调用安全）。"""
+        self.ready = False
+        for name, ctrl in self.controllers.items():
+            ctrl.disconnect()
+            debug_print(self.name, f"Disconnect controller {name} done", "INFO")
+        for name, sensor in self.sensors.items():
+            sensor.disconnect()
+            debug_print(self.name, f"Disconnect sensor {name} done", "INFO")
+
     # ---- 控制 / 观测 ----
     def _apply_action(self, action: np.ndarray):
-        """虚拟：状态直接同步到命令（合成无伺服延迟）。"""
-        self.qpos = action.copy()
+        """把目标 action 拆分到左/右臂控制器下发（限速已在 step() 内完成）。
+
+        布局：左 6 关节 + 左夹爪 + 右 6 关节 + 右夹爪（对齐 QPOS=14）。
+        """
+        left = self.controllers["left_arm"]
+        right = self.controllers["right_arm"]
+        left.set_joint(np.asarray(action[:6], dtype=np.float64).copy())
+        left.set_gripper(float(action[6]))
+        right.set_joint(np.asarray(action[7:13], dtype=np.float64).copy())
+        right.set_gripper(float(action[13]))
 
     def get_observation_qpos(self) -> np.ndarray:
-        """当前扁平关节 qpos（QPOS 维，float32）。"""
-        return self.qpos.astype(np.float32)
+        """读取当前帧原始观测的 qpos（扁平 QPOS 维）——从控制器「手搓」。
+
+        布局（对齐 QPOS=14）：左 6 关节 + 左夹爪 + 右 6 关节 + 右夹爪。
+        """
+        left_joint = self.controllers["left_arm"].get_joint()
+        left_gripper = self.controllers["left_arm"].get_gripper()
+        right_joint = self.controllers["right_arm"].get_joint()
+        right_gripper = self.controllers["right_arm"].get_gripper()
+        if (left_joint is None or left_gripper is None
+                or right_joint is None or right_gripper is None):
+            raise RuntimeError("TestRobot.get_observation_qpos: 控制器读取失败（返回 None）")
+        return np.concatenate([
+            np.asarray(left_joint).ravel(),
+            np.asarray(left_gripper).ravel(),
+            np.asarray(right_joint).ravel(),
+            np.asarray(right_gripper).ravel(),
+        ]).astype(np.float32)
 
     def get_observation_images(self) -> list:
-        """合成各相机 raw RGB 帧（顺序对齐 IMAGE_NAMES）。"""
-        return [self._synthetic_image(i) for i in range(len(self.IMAGE_NAMES))]
+        """读取各相机 raw RGB 帧（顺序对齐 IMAGE_NAMES）。
 
-    def _synthetic_image(self, index: int) -> np.ndarray:
-        """合成相机帧：RGB 渐变 + 移动方块（raw RGB，HxWx3 uint8）。"""
-        w, h = self.IMAGES[self.IMAGE_NAMES[index]]
-        t = self._frame * 0.04 + index * 1.7
-        self._frame += 1
-        img = np.zeros((h, w, 3), dtype=np.uint8)
-        for x in range(w):
-            img[:, x, 0] = np.cos(t + x * 0.02) * 127 + 128  # 红色
-            img[:, x, 1] = np.cos(t + 3.14 + x * 0.02) * 127 + 128  # 绿色
-        cx = int((np.sin(t) * 0.5 + 0.5) * (w - 40))
-        cy = int((np.cos(t * 1.3) * 0.5 + 0.5) * (h - 40))
-        img[cy : cy + 40, cx : cx + 40] = (255, 200, 100)
-        return img
+        从 test 视觉传感器读 color（JPEG），解码为 raw RGB——与真实 piper 接入位一致。
+        """
+        images = []
+        for name in self.IMAGE_NAMES:
+            info = self.sensors[name].get_information()
+            color = info.get("color") if info else None
+            if color is None:
+                raise RuntimeError(f"TestRobot.get_observation_images: 相机 {name} 无帧")
+            decoded = cv2.imdecode(color, cv2.IMREAD_COLOR)
+            if decoded is None:
+                raise RuntimeError(f"TestRobot.get_observation_images: 相机 {name} JPEG 解码失败")
+            images.append(decoded[:, :, ::-1])  # BGR → RGB
+        return images

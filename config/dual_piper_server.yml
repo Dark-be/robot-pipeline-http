@@ -1,13 +1,19 @@
 INFO_LEVEL: INFO # DEBUG, INFO, ERROR
 
+# 服务器监听地址（命令行 --host/--port 可覆盖）
+server:
+  host: 0.0.0.0
+  port: 8090
+
 # 机器人控制配置（真实双臂接入位；硬件 SDK 仅在机器人端安装）
 robot:
   name: dual_piper
-  type: dual_piper
+  type: dual_piper_robot # ROBOT_REGISTRY 键（get_robot 按此自动匹配）
   step_rad: 0.1 # 每帧最大关节增量（rad），env 主循环限速接近 target
   init_qpos: [0, 0.1, 0, 0, 0, 0, 1, 0, 0.1, 0, 0, 0, 0, 1]
 
-# 采集配置（env 在 capture start/end 之间把观测写成一条 hdf5 episode）
+# 采集配置（env 在 capture start/end 之间把观测写成一条 episode）
 collector:
+  type: act_mcap # 采集器类型：act_mcap（act_hdf5 暂不可用）
   save_dir: ./data/dual_piper # 采集数据保存目录
   image_format: jpeg # 图像编码：jpeg | raw
