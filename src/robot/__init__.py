@@ -33,6 +33,7 @@ import importlib
 ROBOT_REGISTRY = {
     "test_robot": ("robot.test_robot", "TestRobot"),  # 虚拟（无硬件，离线联调）
     "dual_piper_robot": ("robot.dual_piper_robot", "DualPiperRobot"),  # 真实双臂接入位
+    "single_piper_robot": ("robot.single_piper_robot", "SinglePiperRobot"),  # 单臂 Leader+Follower 遥操作
 }
 
 

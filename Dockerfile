@@ -1,6 +1,4 @@
-FROM ros:jazzy-ros-base
-
-ENV ROS_DISTRO=jazzy
+FROM ubuntu:22.04
 
 RUN apt-get update && apt-get install -y \
     wget \
@@ -13,6 +11,7 @@ can-utils \
 iproute2 \
 python3-pip \
 libusb-1.0-0 \
+ethtool \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh

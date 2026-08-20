@@ -1,8 +1,8 @@
 # docker-compose.yml
 services:
-  robot-pipeline:
-    image: robot-pipeline:latest
-    container_name: pipeline-container
+  edge:
+    image: edge:latest
+    container_name: edge-container
     network_mode: host
     privileged: true
     # devices:
@@ -20,7 +20,7 @@ services:
       - /sys/class/video4linux:/sys/class/video4linux:ro
       - /sys/bus/usb:/sys/bus/usb:ro
       - /dev:/dev:rw
-      - /home/server/project:/root/project:rw
+      - /home/server/project:/root/workspace:rw
     stdin_open: true
     tty: true
     command: "/bin/bash"

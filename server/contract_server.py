@@ -153,7 +153,8 @@ class _ShmPublisher:
         )
 
     def _create_writer(self) -> ObsShmWriter:
-        image_size = next(iter(self.robot.IMAGES.values()))  # 相机尺寸（假设各相机一致）
+        # 相机尺寸（假设各相机一致）；无相机机器人（IMAGES 为空）用占位尺寸，image_count=0 无图像数据
+        image_size = next(iter(self.robot.IMAGES.values()), (640, 480))
         try:
             writer = ObsShmWriter(
                 name=self.robot.SHM_NAME,

@@ -1,0 +1,17 @@
+INFO_LEVEL: INFO # DEBUG, INFO, ERROR
+
+# 机器人控制配置（单臂双 Piper：Leader 主臂 + Follower 从臂；硬件 SDK 仅在机器人端安装）
+robot:
+  name: single_piper
+  type: single_piper_robot
+  step_rad: 0.1 # 每帧最大关节增量（rad），env 主循环限速接近 target
+  init_qpos: [0, 0, 0, 0, 0, 0, 1] # 6 关节 + 夹爪（Follower 从臂动作维度）
+  leader_port: can_right # Leader 主臂 CAN 端口
+  follower_port: can_left # Follower 从臂 CAN 端口
+  leader_firmware: v188 # Leader 主臂固件版本（default / v188 / v189；按实际固件调整）
+  follower_firmware: v188 # Follower 从臂固件版本
+
+# 采集配置（env 在 capture start/end 之间把观测写成一条 hdf5 episode）
+collector:
+  save_dir: ./data/single_piper # 采集数据保存目录
+  image_format: jpeg # 图像编码：jpeg | raw（本机器人无相机，无实际图像数据）
