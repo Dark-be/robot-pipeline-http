@@ -31,6 +31,7 @@ from robot.controller.piper_controller import PiperController  # noqa: E402
 from robot.controller.alicia_teach_controller import AliciaTeachController  # noqa: E402
 from robot.sensor.realsense_sensor import RealsenseSensor  # noqa: E402
 from robot.sensor.v4l2_sensor import V4l2Sensor  # noqa: E402
+from robot.sensor.cv2_sensor import Cv2Sensor  # noqa: E402
 from utils.base.data_handler import debug_print  # noqa: E402
 import cv2
 
@@ -60,8 +61,8 @@ class DualPiperRobot(BaseRobot):
         }
         self.sensors: dict = {
             'cam_head': RealsenseSensor('cam_head'),
-            'cam_left_wrist': V4l2Sensor('cam_left_wrist'),
-            'cam_right_wrist': V4l2Sensor('cam_right_wrist'),
+            'cam_left_wrist': Cv2Sensor('cam_left_wrist'),
+            'cam_right_wrist': Cv2Sensor('cam_right_wrist'),
         }
 
     def connect(self):
@@ -74,9 +75,9 @@ class DualPiperRobot(BaseRobot):
         self.controllers['left_arm'].connect(port='can_left')
         self.controllers['right_arm'].connect(port='can_right')
         debug_print(self.name, "Setup controllers done", "INFO")
-        self.sensors['cam_head'].connect(device="261222074970", is_jpeg=True)
-        self.sensors['cam_left_wrist'].connect(device="/dev/left-camera", is_jpeg=True)
-        self.sensors['cam_right_wrist'].connect(device="/dev/right-camera", is_jpeg=True)
+        self.sensors['cam_head'].connect(device="261222074970", pixel_format="raw")  # Realsense D435i
+        self.sensors['cam_left_wrist'].connect(device="/dev/left-camera", pixel_format="raw")  # V4L2 腕相机
+        self.sensors['cam_right_wrist'].connect(device="/dev/right-camera", pixel_format="raw")  # V4L2 腕相机
         debug_print(self.name, "Setup sensors done", "INFO")
         self.ready = True
 
@@ -111,17 +112,22 @@ class DualPiperRobot(BaseRobot):
         """读取当前帧原始观测的 images——从相机传感器直接取 color。
 
         顺序对齐 IMAGE_NAMES（cam_head / cam_left_wrist / cam_right_wrist）；任一无帧时报错。
+        相机按 sensor.pixel_format 区分：jpg → color 为 JPEG bytes（此处 imdecode）；
+        raw → color 已解码为 RGB ndarray（直接使用）。
         """
         images = []
         for name in self.IMAGE_NAMES:
-            info = self.sensors[name].get_information()
+            sensor = self.sensors[name]
+            info = sensor.get_information()
             color = info.get("color") if info else None
             if color is None:
                 raise RuntimeError(f"DualPiperRobot.get_observation_images: 相机 {name} 无帧")
+            if getattr(sensor, "pixel_format", V4l2Sensor.PIXEL_FORMAT_JPG) != V4l2Sensor.PIXEL_FORMAT_JPG:
+                images.append(color)  # raw（V4l2/Realsense）：已解码为 RGB（HxWx3）
+                continue
             decoded = cv2.imdecode(color, cv2.IMREAD_COLOR)
             if decoded is None:
-                # raise RuntimeError(f"DualPiperRobot.get_observation_images: 相机 {name} JPEG 解码失败")
-                debug_print(self.name, f"相机 {name} JPEG 解码失败，返回空帧", "WARNNING")
+                debug_print(self.name, f"相机 {name} JPEG 解码失败，返回空帧", "WARNING")
                 decoded = np.zeros((self.IMAGES[name][1], self.IMAGES[name][0], 3), dtype=np.uint8)
             images.append(decoded[:, :, ::-1])  # BGR → RGB
         return images
@@ -151,7 +157,7 @@ class DualPiperRobot(BaseRobot):
         right_gripper = self.controllers["right_master"].get_gripper()
         if left_joint is None or left_gripper is None or right_joint is None or right_gripper is None:
             return None
-        print(f"Teleop target: left_gripper={left_gripper}, right_gripper={right_gripper}")
+        #print(f"Teleop target: left_gripper={left_gripper}, right_gripper={right_gripper}")
         return np.concatenate([
             left_joint, [left_gripper],
             right_joint, [right_gripper],

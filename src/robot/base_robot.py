@@ -134,7 +134,10 @@ class BaseRobot:
         if self.action is None:
             self.action = self._init_action_from_qpos()
 
-        self.action = self._step_toward(self.action, self.target_action, self.step_rad)
+        self.action[0:6] = self._step_toward(self.action[0:6], self.target_action[0:6], self.step_rad)
+        self.action[6] = self.target_action[6]  # 夹爪直接跟随目标（不插值）
+        self.action[7:13] = self._step_toward(self.action[7:13], self.target_action[7:13], self.step_rad)
+        self.action[13] = self.target_action[13]  # 夹爪直接跟随目标（不插值）
         
         self._apply_action(self.action)
 
