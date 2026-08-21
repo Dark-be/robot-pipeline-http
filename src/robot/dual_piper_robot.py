@@ -120,7 +120,9 @@ class DualPiperRobot(BaseRobot):
                 raise RuntimeError(f"DualPiperRobot.get_observation_images: 相机 {name} 无帧")
             decoded = cv2.imdecode(color, cv2.IMREAD_COLOR)
             if decoded is None:
-                raise RuntimeError(f"DualPiperRobot.get_observation_images: 相机 {name} JPEG 解码失败")
+                # raise RuntimeError(f"DualPiperRobot.get_observation_images: 相机 {name} JPEG 解码失败")
+                debug_print(self.name, f"相机 {name} JPEG 解码失败，返回空帧", "WARNNING")
+                decoded = np.zeros((self.IMAGES[name][1], self.IMAGES[name][0], 3), dtype=np.uint8)
             images.append(decoded[:, :, ::-1])  # BGR → RGB
         return images
 
@@ -149,6 +151,7 @@ class DualPiperRobot(BaseRobot):
         right_gripper = self.controllers["right_master"].get_gripper()
         if left_joint is None or left_gripper is None or right_joint is None or right_gripper is None:
             return None
+        print(f"Teleop target: left_gripper={left_gripper}, right_gripper={right_gripper}")
         return np.concatenate([
             left_joint, [left_gripper],
             right_joint, [right_gripper],

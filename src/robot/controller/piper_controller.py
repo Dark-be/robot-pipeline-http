@@ -150,7 +150,7 @@ class PiperController(ArmController):
         if gripper_state is None:
             debug_print(self.name, "Failed to get gripper status")
             return None
-        return gripper_state.msg.value * 10
+        return gripper_state.msg.value * 0.01
 
     @_require_robot
     def set_joint(self, joint: np.ndarray):
@@ -186,8 +186,8 @@ class PiperController(ArmController):
     @_require_robot
     def set_gripper(self, gripper: float):
         if not (1 >= gripper >= 0):
-            gripper = np.clip(gripper, 0, 1)
             debug_print(self.name, f"gripper better be 0~1, but get number {gripper}", "WARNING")
+            gripper = np.clip(gripper, 0, 1)
         else:
             gripper_cmd = gripper / 10
             self.gripper.move_gripper_m(gripper_cmd)
