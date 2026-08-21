@@ -20,9 +20,12 @@
 内存开销只随单帧大小）→ ``finish()`` 写入 footer 并返回文件路径：:
 
     c = ActMcapCollector({"save_dir": "./data"})
-    c.start(episode_idx=0)    # 开启 episode（打开 .mcap 文件）
+    c.start()                 # 自动检测 save_dir 下最大 episode 编号（+1）打开 .mcap
     c.collect(standard_obs)   # 每帧直接落盘
     c.finish()                # -> 已写入的 .mcap 文件 Path
+
+    # 也可显式指定编号：c.start(episode_idx=5)
+    # 默认自动续接：save_dir 已有 episode_100.mcap → 本次写入 episode_101.mcap
 """
 
 from __future__ import annotations
@@ -124,14 +127,32 @@ class ActMcapCollector:
             raise ValueError("Failed to encode image as JPEG")
         return buf.tobytes()
 
-    def start(self, episode_idx: int):
+    def _next_episode_idx(self) -> int:
+        """扫描 save_dir 下 ``episode_*.mcap``，返回最大编号 + 1（无则 0）。
+
+        例如 save_dir 已有 episode_100.mcap，则返回 101，供 start() 自动续接。
+        """
+        max_idx = -1
+        for p in self._save_dir.glob("episode_*.mcap"):
+            try:
+                idx = int(p.stem[len("episode_"):])
+            except ValueError:
+                continue
+            max_idx = max(max_idx, idx)
+        return max_idx + 1
+
+    def start(self, episode_idx: int | None = None):
         """开启新一轮 episode 的 mcap 文件（流式：collect 直接落盘）。
 
+        ``episode_idx`` 为 None 时自动检测 save_dir 下已有 ``episode_*.mcap`` 的
+        最大编号 + 1（如已有 episode_100 → 写 episode_101）；显式传入则用该编号。
         若上一轮未 finish，先防御性关闭（写 footer）再开新文件。
         """
         self._close_writer()
         from mcap_ros2.writer import Writer
 
+        if episode_idx is None:
+            episode_idx = self._next_episode_idx()
         self._path = self._save_dir / f"episode_{episode_idx}.mcap"
         self._fp = open(self._path, "wb")
         self._writer = Writer(self._fp)

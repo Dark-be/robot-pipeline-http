@@ -221,7 +221,7 @@ class BaseEnv:
                 self._episode_open = True
                 start = getattr(self._collector, "start", None)
                 if start is not None:
-                    start(self._episode_idx)
+                    start()  # 不传编号：由 collector 自动续接 save_dir 下最大 episode 编号
             self._collector.collect(self.observation)
         elif self._episode_open:
             self._episode_open = False
